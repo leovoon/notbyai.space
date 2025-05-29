@@ -24,26 +24,43 @@ function App() {
 function MainApp() {
   const [currentView, setCurrentView] = useState('feed');
   const [userRole, setUserRole] = useState('new_user');
-  const { getToken } = useAuth();
+  const [authError, setAuthError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const { getToken, isSignedIn } = useAuth();
   const { user } = useUser();
 
   // Sync user with backend on auth
   useEffect(() => {
     const syncUser = async () => {
-      if (user) {
+      if (user && isSignedIn) {
         try {
+          setIsLoading(true);
+          setAuthError('');
           const token = await getToken();
+          console.log('Syncing user with backend...');
+          
           const response = await axios.post(`${API}/auth/sync`, {}, {
             headers: { Authorization: `Bearer ${token}` }
           });
+          
           setUserRole(response.data.user.role);
+          console.log('User synced successfully:', response.data.user);
+          setIsLoading(false);
         } catch (error) {
           console.error('Error syncing user:', error);
+          setAuthError(`Authentication sync failed: ${error.response?.data?.detail || error.message}`);
+          setIsLoading(false);
         }
+      } else {
+        setIsLoading(false);
       }
     };
     syncUser();
-  }, [user, getToken]);
+  }, [user, isSignedIn, getToken]);
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
@@ -51,15 +68,54 @@ function MainApp() {
         <AuthPage />
       </SignedOut>
       <SignedIn>
-        <div className="flex flex-col min-h-screen">
-          <Header userRole={userRole} currentView={currentView} setCurrentView={setCurrentView} />
-          <main className="flex-1 p-4">
-            {currentView === 'feed' && <FeedView />}
-            {currentView === 'create' && <CreatePostView />}
-            {currentView === 'moderate' && userRole !== 'new_user' && <ModerationView />}
-          </main>
-        </div>
+        {authError ? (
+          <ErrorPage error={authError} onRetry={() => window.location.reload()} />
+        ) : (
+          <div className="flex flex-col min-h-screen">
+            <Header userRole={userRole} currentView={currentView} setCurrentView={setCurrentView} />
+            <main className="flex-1 p-4">
+              {currentView === 'feed' && <FeedView />}
+              {currentView === 'create' && <CreatePostView />}
+              {currentView === 'moderate' && userRole !== 'new_user' && <ModerationView />}
+              {currentView === 'profile' && <ProfileView userRole={userRole} />}
+            </main>
+          </div>
+        )}
       </SignedIn>
+    </div>
+  );
+}
+
+// Loading screen component
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600 mx-auto mb-4"></div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Not by AI.space</h2>
+        <p className="text-gray-600">Connecting you to authentic human content...</p>
+      </div>
+    </div>
+  );
+}
+
+// Error page component
+function ErrorPage({ error, onRetry }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
+      <div className="max-w-md w-full text-center p-8">
+        <div className="bg-white rounded-xl shadow-lg p-8">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Authentication Error</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={onRetry}
+            className="w-full py-3 px-4 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -68,26 +124,31 @@ function MainApp() {
 function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
+  const [showInviteInput, setShowInviteInput] = useState(false);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
       <div className="max-w-md w-full space-y-8 p-8">
         <div className="text-center">
+          <div className="text-6xl mb-4">🧠</div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Not by AI.space</h1>
-          <p className="text-gray-600">Authentic human connections in a curated space</p>
+          <p className="text-gray-600 mb-6">Authentic human connections in a curated space</p>
+          <div className="bg-purple-100 rounded-lg p-4 text-sm text-purple-800 mb-6">
+            <strong>Platform Values:</strong> Authenticity • Vulnerability • Genuine Human Expression
+          </div>
         </div>
         
         <div className="bg-white p-8 rounded-xl shadow-lg">
           <div className="flex space-x-4 mb-6">
             <button
               onClick={() => setIsSignUp(false)}
-              className={`flex-1 py-2 text-center rounded-lg ${!isSignUp ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+              className={`flex-1 py-2 text-center rounded-lg transition-colors ${!isSignUp ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
             >
               Sign In
             </button>
             <button
               onClick={() => setIsSignUp(true)}
-              className={`flex-1 py-2 text-center rounded-lg ${isSignUp ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+              className={`flex-1 py-2 text-center rounded-lg transition-colors ${isSignUp ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
             >
               Sign Up
             </button>
@@ -95,19 +156,32 @@ function AuthPage() {
 
           {isSignUp && (
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Moderator Invite Code (Optional)
-              </label>
-              <input
-                type="text"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
-                placeholder="Enter invite code"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Leave blank for regular user account
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Special Access
+                </label>
+                <button
+                  onClick={() => setShowInviteInput(!showInviteInput)}
+                  className="text-sm text-purple-600 hover:text-purple-800"
+                >
+                  {showInviteInput ? 'Hide' : 'Have an invite code?'}
+                </button>
+              </div>
+              
+              {showInviteInput && (
+                <>
+                  <input
+                    type="text"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                    placeholder="Enter moderator invite code"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Moderator invite codes grant special platform privileges
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -115,47 +189,97 @@ function AuthPage() {
             {isSignUp ? <SignUp /> : <SignIn />}
           </div>
         </div>
+        
+        <div className="text-center text-sm text-gray-500">
+          <p>By joining, you commit to sharing authentic, vulnerable content</p>
+        </div>
       </div>
     </div>
   );
 }
 
-// Header component
+// Header component with improved design
 function Header({ userRole, currentView, setCurrentView }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   return (
-    <header className="bg-white shadow-sm border-b">
+    <header className="bg-white shadow-sm border-b sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Not by AI.space</h1>
+        <div className="flex items-center space-x-4">
+          <div className="text-2xl">🧠</div>
+          <h1 className="text-2xl font-bold text-gray-900">Not by AI.space</h1>
+        </div>
         
-        <nav className="flex space-x-6">
-          <button
+        <nav className="hidden md:flex space-x-6">
+          <NavButton 
+            label="Daily Feed" 
+            isActive={currentView === 'feed'}
             onClick={() => setCurrentView('feed')}
-            className={`px-4 py-2 rounded-lg ${currentView === 'feed' ? 'bg-purple-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-          >
-            Daily Feed
-          </button>
-          <button
+            icon="📰"
+          />
+          <NavButton 
+            label="Create Post" 
+            isActive={currentView === 'create'}
             onClick={() => setCurrentView('create')}
-            className={`px-4 py-2 rounded-lg ${currentView === 'create' ? 'bg-purple-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-          >
-            Create Post
-          </button>
+            icon="✍️"
+          />
           {userRole !== 'new_user' && (
-            <button
+            <NavButton 
+              label="Moderate" 
+              isActive={currentView === 'moderate'}
               onClick={() => setCurrentView('moderate')}
-              className={`px-4 py-2 rounded-lg ${currentView === 'moderate' ? 'bg-purple-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-            >
-              Moderate
-            </button>
+              icon="⚖️"
+            />
           )}
+          <NavButton 
+            label="Profile" 
+            isActive={currentView === 'profile'}
+            onClick={() => setCurrentView('profile')}
+            icon="👤"
+          />
         </nav>
         
         <div className="flex items-center space-x-4">
-          <span className="text-sm text-gray-600 capitalize">{userRole.replace('_', ' ')}</span>
+          <RoleBadge role={userRole} />
           <UserButton />
         </div>
       </div>
     </header>
+  );
+}
+
+// Navigation button component
+function NavButton({ label, isActive, onClick, icon }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+        isActive 
+          ? 'bg-purple-600 text-white' 
+          : 'text-gray-700 hover:bg-gray-100'
+      }`}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+// Role badge component
+function RoleBadge({ role }) {
+  const roleConfig = {
+    new_user: { label: 'Member', color: 'bg-blue-100 text-blue-700', icon: '👤' },
+    moderator: { label: 'Moderator', color: 'bg-green-100 text-green-700', icon: '⚖️' },
+    seed_user: { label: 'Seed User', color: 'bg-purple-100 text-purple-700', icon: '🌱' }
+  };
+
+  const config = roleConfig[role] || roleConfig.new_user;
+
+  return (
+    <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+      <span>{config.icon}</span>
+      <span>{config.label}</span>
+    </div>
   );
 }
 
