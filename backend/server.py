@@ -196,10 +196,10 @@ async def register_user(user_data: UserCreate):
 async def sync_user(payload: dict = Depends(verify_clerk_token)):
     """Sync user data from Clerk"""
     clerk_id = payload.get('sub')
-    email = payload.get('email')
+    email = payload.get('email', payload.get('email_addresses', [{}])[0].get('email_address', 'unknown@example.com'))
     
-    if not clerk_id or not email:
-        raise HTTPException(status_code=400, detail="Invalid token payload")
+    if not clerk_id:
+        raise HTTPException(status_code=400, detail="Invalid token payload - missing user ID")
     
     # Check if user exists
     user = await db.users.find_one({"clerk_id": clerk_id})
@@ -212,8 +212,10 @@ async def sync_user(payload: dict = Depends(verify_clerk_token)):
             role=UserRole.NEW_USER
         )
         await db.users.insert_one(new_user.dict())
+        logger.info(f"Created new user: {clerk_id} - {email}")
         return {"message": "User created", "user": new_user.dict()}
     
+    logger.info(f"User exists: {clerk_id}")
     return {"message": "User exists", "user": User(**user).dict()}
 
 @api_router.get("/me")
