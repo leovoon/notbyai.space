@@ -100,6 +100,25 @@ class NotByAIAPITester(unittest.TestCase):
         self.assertIn('user', data)
         self.user_id = data['user']['id']
         print(f"✅ User sync successful, user_id: {self.user_id}")
+        print(f"✅ Token used: {self.token}")
+        
+        # Print the decoded token payload for debugging
+        import base64
+        import json
+        
+        try:
+            # Split the token and decode the payload
+            parts = self.token.split('.')
+            if len(parts) == 3:
+                # Decode the payload (middle part)
+                payload_part = parts[1]
+                # Add padding if needed for base64 decoding
+                payload_part += '=' * (-len(payload_part) % 4)
+                decoded = base64.urlsafe_b64decode(payload_part)
+                payload = json.loads(decoded)
+                print(f"✅ Token payload: {json.dumps(payload, indent=2)}")
+        except Exception as e:
+            print(f"❌ Error decoding token: {str(e)}")
     
     def test_03_get_me(self):
         """Test getting current user info"""
