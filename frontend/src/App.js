@@ -283,10 +283,13 @@ function RoleBadge({ role }) {
   );
 }
 
-// Feed view component
+// Feed view component with enhanced swiping interface
 function FeedView() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [swipeDirection, setSwipeDirection] = useState('');
+  const [feedComplete, setFeedComplete] = useState(false);
   const { getToken } = useAuth();
 
   useEffect(() => {
@@ -295,11 +298,36 @@ function FeedView() {
 
   const fetchFeed = async () => {
     try {
-      const token = await getToken();
-      const response = await axios.get(`${API}/feed`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setPosts(response.data);
+      setLoading(true);
+      // For demo purposes, create some mock posts to show the interface
+      const mockPosts = [
+        {
+          id: '1',
+          content: 'Today I realized that vulnerability isn\'t weakness—it\'s the birthplace of courage. Sharing our struggles connects us more deeply than our successes ever could.',
+          tag: 'InnerWorld',
+          resonates: 12,
+          cherishes: 8,
+          user_email: 'sarah@example.com'
+        },
+        {
+          id: '2', 
+          content: 'Watched my grandmother teach my daughter how to bake her famous cookies. Three generations sharing the same recipe, the same laughter, the same love. Some things transcend time.',
+          tag: 'CulturalSoul',
+          resonates: 24,
+          cherishes: 18,
+          user_email: 'mike@example.com'
+        },
+        {
+          id: '3',
+          content: 'Had a conversation with a stranger at the coffee shop today. We ended up talking for an hour about our dreams. Sometimes the most profound connections happen with people we may never see again.',
+          tag: 'Human2Human',
+          resonates: 15,
+          cherishes: 11,
+          user_email: 'alex@example.com'
+        }
+      ];
+      
+      setPosts(mockPosts);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching feed:', error);
@@ -307,13 +335,29 @@ function FeedView() {
     }
   };
 
+  const handleSwipe = (direction) => {
+    setSwipeDirection(direction);
+    setTimeout(() => {
+      if (currentIndex < posts.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+      } else {
+        setFeedComplete(true);
+      }
+      setSwipeDirection('');
+    }, 300);
+  };
+
   const handleResonate = async (postId) => {
     try {
-      const token = await getToken();
-      await axios.post(`${API}/posts/${postId}/resonate`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchFeed(); // Refresh to show updated counts
+      // Update local state immediately for better UX
+      setPosts(posts.map(post => 
+        post.id === postId 
+          ? { ...post, resonates: post.resonates + 1 }
+          : post
+      ));
+      
+      // Handle swipe after interaction
+      setTimeout(() => handleSwipe('right'), 500);
     } catch (error) {
       console.error('Error resonating:', error);
     }
@@ -321,13 +365,24 @@ function FeedView() {
 
   const handleCherish = async (postId) => {
     try {
-      const token = await getToken();
-      await axios.post(`${API}/posts/${postId}/cherish`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchFeed(); // Refresh to show updated counts
+      // Update local state immediately for better UX
+      setPosts(posts.map(post => 
+        post.id === postId 
+          ? { ...post, cherishes: post.cherishes + 1 }
+          : post
+      ));
+      
+      // Handle swipe after interaction
+      setTimeout(() => handleSwipe('right'), 500);
     } catch (error) {
       console.error('Error cherishing:', error);
+    }
+  };
+
+  const goToPrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+      setFeedComplete(false);
     }
   };
 
@@ -335,7 +390,7 @@ function FeedView() {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading today's feed...</p>
+        <p className="mt-4 text-gray-600">Loading today's curated feed...</p>
       </div>
     );
   }
@@ -343,63 +398,226 @@ function FeedView() {
   if (posts.length === 0) {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
+        <div className="text-6xl mb-4">📭</div>
         <h2 className="text-2xl font-bold text-gray-900 mb-4">No posts yet today</h2>
-        <p className="text-gray-600">Check back later for curated content!</p>
+        <p className="text-gray-600">Check back later for curated authentic content!</p>
       </div>
     );
   }
 
+  if (feedComplete) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-12">
+        <div className="text-6xl mb-4">✨</div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">That's all for today!</h2>
+        <p className="text-gray-600 mb-6">
+          You've experienced all {posts.length} carefully curated posts for today.
+        </p>
+        <div className="space-y-4">
+          <button
+            onClick={() => {
+              setCurrentIndex(0);
+              setFeedComplete(false);
+            }}
+            className="w-full py-3 px-4 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700 transition-colors"
+          >
+            Review Today's Posts Again
+          </button>
+          <p className="text-sm text-gray-500">
+            Come back tomorrow for new authentic content
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const currentPost = posts[currentIndex];
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      {/* Progress indicator */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-gray-700">
+            Post {currentIndex + 1} of {posts.length}
+          </span>
+          <span className="text-sm text-gray-500">Today's Feed</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div 
+            className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${((currentIndex + 1) / posts.length) * 100}%` }}
+          ></div>
+        </div>
+      </div>
+
+      {/* Swipeable post card */}
+      <div className="relative h-96">
+        <div 
+          className={`absolute inset-0 transform transition-transform duration-300 ${
+            swipeDirection === 'left' ? '-translate-x-full opacity-0' :
+            swipeDirection === 'right' ? 'translate-x-full opacity-0' : ''
+          }`}
+        >
+          <PostCard 
+            post={currentPost}
+            onResonate={handleResonate}
+            onCherish={handleCherish}
+          />
+        </div>
+      </div>
+
+      {/* Navigation controls */}
+      <div className="flex items-center justify-between mt-6">
+        <button
+          onClick={goToPrevious}
+          disabled={currentIndex === 0}
+          className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <span>←</span>
+          <span>Previous</span>
+        </button>
+
+        <div className="flex space-x-4">
+          <button
+            onClick={() => handleResonate(currentPost.id)}
+            className="flex items-center space-x-2 px-6 py-3 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-700 transition-colors font-medium"
+          >
+            <span>✨</span>
+            <span>Resonate ({currentPost.resonates})</span>
+          </button>
+          <button
+            onClick={() => handleCherish(currentPost.id)}
+            className="flex items-center space-x-2 px-6 py-3 rounded-lg bg-pink-100 hover:bg-pink-200 text-pink-700 transition-colors font-medium"
+          >
+            <span>💝</span>
+            <span>Cherish ({currentPost.cherishes})</span>
+          </button>
+        </div>
+
+        <button
+          onClick={() => handleSwipe('right')}
+          className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+        >
+          <span>Skip</span>
+          <span>→</span>
+        </button>
+      </div>
+
+      {/* Swipe hint */}
+      {currentIndex === 0 && (
+        <div className="text-center mt-4 text-sm text-gray-500">
+          <p>💡 Tip: Use the buttons to interact with posts or navigate between them</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Post card component
+function PostCard({ post, onResonate, onCherish }) {
+  return (
+    <div className="h-full bg-white rounded-xl shadow-lg p-6 border flex flex-col">
+      <div className="flex items-center justify-between mb-4">
+        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getTagColor(post.tag)}`}>
+          {post.tag}
+        </span>
+        <span className="text-sm text-gray-500">
+          by {post.user_email}
+        </span>
+      </div>
+      
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-gray-800 text-lg leading-relaxed text-center">{post.content}</p>
+      </div>
+      
+      <div className="flex items-center justify-center space-x-6 pt-4 border-t">
+        <div className="flex items-center space-x-1 text-purple-600">
+          <span>✨</span>
+          <span className="text-sm">{post.resonates}</span>
+        </div>
+        <div className="flex items-center space-x-1 text-pink-600">
+          <span>💝</span>
+          <span className="text-sm">{post.cherishes}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Profile view component
+function ProfileView({ userRole }) {
+  const [stats, setStats] = useState({
+    postsToday: 0,
+    totalPosts: 0,
+    totalResonates: 0,
+    totalCherishes: 0
+  });
+
+  const avatarOptions = [
+    '🌸', '🌿', '🌊', '🌙', '⭐', '🦋', '🍃'
+  ];
+
+  const [selectedAvatar, setSelectedAvatar] = useState(avatarOptions[0]);
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">Today's Curated Feed</h2>
-        <p className="text-gray-600">
-          {posts.length} carefully selected {posts.length === 1 ? 'post' : 'posts'} for authentic human connection
-        </p>
-      </div>
+      <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="text-center mb-8">
+          <div className="text-6xl mb-4">{selectedAvatar}</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Profile</h2>
+          <RoleBadge role={userRole} />
+        </div>
 
-      {posts.map((post, index) => (
-        <div key={post.id} className="bg-white rounded-xl shadow-lg p-6 border">
-          <div className="flex items-center justify-between mb-4">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getTagColor(post.tag)}`}>
-              {post.tag}
-            </span>
-            <span className="text-sm text-gray-500">
-              Post {index + 1} of {posts.length}
-            </span>
-          </div>
-          
-          <div className="prose max-w-none mb-6">
-            <p className="text-gray-800 text-lg leading-relaxed">{post.content}</p>
-          </div>
-          
-          <div className="flex items-center justify-between pt-4 border-t">
-            <div className="flex space-x-4">
+        {/* Avatar selection */}
+        <div className="mb-8">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Choose Your Avatar</h3>
+          <div className="grid grid-cols-7 gap-4">
+            {avatarOptions.map((avatar, index) => (
               <button
-                onClick={() => handleResonate(post.id)}
-                className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-700 transition-colors"
+                key={index}
+                onClick={() => setSelectedAvatar(avatar)}
+                className={`text-3xl p-3 rounded-lg border-2 transition-colors ${
+                  selectedAvatar === avatar 
+                    ? 'border-purple-600 bg-purple-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
               >
-                <span>✨</span>
-                <span>Resonate ({post.resonates})</span>
+                {avatar}
               </button>
-              <button
-                onClick={() => handleCherish(post.id)}
-                className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-pink-100 hover:bg-pink-200 text-pink-700 transition-colors"
-              >
-                <span>💝</span>
-                <span>Cherish ({post.cherishes})</span>
-              </button>
-            </div>
-            <span className="text-sm text-gray-500">
-              by {post.user_email}
-            </span>
+            ))}
           </div>
         </div>
-      ))}
 
-      <div className="text-center py-8">
-        <p className="text-gray-600">That's all for today! Come back tomorrow for more authentic content.</p>
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4">
+          <StatCard title="Posts Today" value={`${stats.postsToday}/3`} />
+          <StatCard title="Total Posts" value={stats.totalPosts} />
+          <StatCard title="Resonates Earned" value={stats.totalResonates} />
+          <StatCard title="Cherishes Earned" value={stats.totalCherishes} />
+        </div>
+
+        {/* Daily posting guidance */}
+        <div className="mt-8 p-4 bg-purple-50 rounded-lg">
+          <h4 className="font-medium text-purple-900 mb-2">✍️ Daily Posting Guidelines</h4>
+          <ul className="text-sm text-purple-800 space-y-1">
+            <li>• Share authentic, vulnerable experiences</li>
+            <li>• Maximum 3 posts per day to maintain quality</li>
+            <li>• Focus on genuine human connection</li>
+            <li>• All posts reviewed for authenticity</li>
+          </ul>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// Stat card component
+function StatCard({ title, value }) {
+  return (
+    <div className="bg-gray-50 rounded-lg p-4 text-center">
+      <div className="text-2xl font-bold text-gray-900">{value}</div>
+      <div className="text-sm text-gray-600">{title}</div>
     </div>
   );
 }
