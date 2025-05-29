@@ -94,26 +94,39 @@ class UserCreate(BaseModel):
 async def verify_clerk_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Verify Clerk JWT token"""
     try:
-        # For now, we'll implement a simplified verification
-        # In production, you'd verify the JWT signature with Clerk's public key
         token = credentials.credentials
         
-        # Decode token (simplified - in production use proper JWT verification)
+        # For development/MVP, we'll use a simplified approach
+        # In production, you'd verify with Clerk's public key using PyJWT
         import base64
         import json
+        
         try:
-            # Simple token validation - in production use proper Clerk verification
-            payload_part = token.split('.')[1]
-            # Add padding if needed
+            # Split the token and decode the payload
+            parts = token.split('.')
+            if len(parts) != 3:
+                raise HTTPException(status_code=401, detail="Invalid token format")
+            
+            # Decode the payload (middle part)
+            payload_part = parts[1]
+            # Add padding if needed for base64 decoding
             payload_part += '=' * (-len(payload_part) % 4)
             decoded = base64.urlsafe_b64decode(payload_part)
             payload = json.loads(decoded)
+            
+            # Basic validation
+            if not payload.get('sub'):
+                raise HTTPException(status_code=401, detail="Invalid token payload")
+            
             return payload
-        except Exception:
-            raise HTTPException(status_code=401, detail="Invalid token")
+            
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        except Exception as e:
+            raise HTTPException(status_code=401, detail="Token verification failed")
             
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code=401, detail="Authentication required")
 
 async def get_current_user(payload: dict = Depends(verify_clerk_token)):
     """Get current user from token"""
